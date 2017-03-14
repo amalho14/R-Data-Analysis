@@ -1,0 +1,279 @@
+library(ROAuth)
+library(ggplot2)
+library(ggmap)
+library(tm)
+library(ggplot2)
+library(ggmap)
+library(ggplot2)
+library(wordcloud)
+require(httr)
+require(httpuv)
+require(jsonlite)
+library(NLP)
+library(tm)
+library(RColorBrewer)
+library(wordcloud)
+library(topicmodels)
+library(SnowballC)
+library(RTextTools)
+library(e1071)
+consumerKey='EeoTShllKHda9oLdihuY5w'
+consumerSecret='UwL9uDCjB-1hBinzhLt8sLTV6GA'
+token='GqcMmQOFhdIQkBxJU0tCLT4apmBwEeY2'
+token_secret='08VOPvc2z8HewKjDXs2IPIA8KSE'
+
+
+# authorization
+myapp = oauth_app("YELP", key=consumerKey, secret=consumerSecret)
+sig=sign_oauth1.0(myapp, token=token,token_secret=token_secret)
+
+limit <- 40
+getData<-function(area1,area2){
+  yelpurl <- paste0("http://api.yelp.com/v2/search/?limit=",limit,"&location=",area1,"%20",area2,"&term=") #Change the term value
+  locationdata=GET(yelpurl, sig)
+  locationdataContent = content(locationdata)
+  return (locationdataContent)
+}
+businessName<-""
+businessLocation<-""
+businessRating<-""
+businessReview<-""
+businessLatitude<-""
+businessLongitude<-""
+
+extractData<-function(searchResult){
+  for (index in 1:40){
+    businessName[index]<-searchResult$businesses[[index]]$name
+    businessLocation[index]<-searchResult$businesses[[index]]$location$state_code
+    businessReview[index]<-gsub("\n", " ", searchResult$businesses[[index]]$snippet_text)
+    businessRating[index]<-searchResult$businesses[[index]]$rating
+    businessLatitude[index]<-searchResult$businesses[[index]]$location$coordinate$latitude
+    businessLongitude[[index]]<-searchResult$businesses[[index]]$location$coordinate$longitude
+  }
+  dataTable<-data.frame(businessName, businessLocation, businessReview, businessRating,businessLatitude,businessLongitude)
+  return(dataTable)
+  print(dataTable)
+}
+writeCSV<-function(dataTableArg){
+  setwd("/Users/Documents/R")
+  write.table(dataTableArg, file="YelpResults.csv", append=TRUE,quote = FALSE, sep = "|",col.names = FALSE, row.names = FALSE)
+}
+searchAndWrite<-function(argumentLocation1,argumentLocation2){
+  searchResult<-getData(argumentLocation1,argumentLocation2)
+  dataTable<-extractData(searchResult)
+  writeCSV(dataTable)
+}
+readFromFile<-function(){
+  setwd("/Users/Documents/R")
+  readTable<-read.csv("YelpResults.csv", header = FALSE, quote = NULL, stringsAsFactors = FALSE, sep = "|")
+  print(readTable)
+}
+returnTable<-function(){
+  setwd("/Users/Documents/R")
+  readTable<-read.csv("YelpResults.csv", header = FALSE,  quote = NULL, stringsAsFactors = FALSE, sep = "|")
+  return(readTable)
+}
+#Get and Store Results from 22 Hotels
+searchAndWrite("New","York")
+searchAndWrite("San","Francisco")
+searchAndWrite("Chicago","Il")
+searchAndWrite("Las","Vegas")
+searchAndWrite("Kansas","City")
+searchAndWrite("Seattle","Washington")
+searchAndWrite("Texas","Austin")
+searchAndWrite("New","Orleans")
+searchAndWrite("Florida","Tampa")
+searchAndWrite("Portland","OR")
+searchAndWrite("Tempe","AZ")
+searchAndWrite("Philadelphia","PA")
+searchAndWrite("Arlington","VA")
+searchAndWrite("Detroit","MI")
+searchAndWrite("Minneapolis","MN")
+searchAndWrite("Ohio","Columbus")
+searchAndWrite("Indiana","Indianapolis")
+searchAndWrite("Kentucky","Cincinnati")
+searchAndWrite("Maryland","Baltimore")
+searchAndWrite("Hawaii","Waikiki")
+searchAndWrite("Massachusetts","Boston")
+searchAndWrite("Kansas","City")
+#Extraction of Data Completed in the above code
+
+#Extracting the mean, median and variance of the rating
+resultTable<-returnTable()
+resultTable
+names(resultTable)<-c('name','state','review','rating','lat','lon')
+uniqueStates<-unique(resultTable$state)
+unique(resultTable$name)
+mean(resultTable$rating)
+sd(resultTable$rating, na.rm = TRUE)
+var(resultTable$rating)
+median(resultTable$rating)
+mean(resultTable$rating)
+#Plot mean with standard deviation
+m<-mean(resultTable$rating)
+std<-sqrt(var(resultTable$rating))
+hist(resultTable$rating,prob=T,main="Rating")
+curve(dnorm(x,mean=m, sd=std), col="red", lwd=2, add=TRUE)
+
+#plot geographical map
+# loading the required packages
+# Data points for latitude and Longitude
+names(resultTable)<-c('name','state','review','rating','lat','lon')
+uniqueStates<-unique(resultTable$state)
+reviews<-resultTable
+reviews
+lat<-resultTable$lat
+lon<-resultTable$lon
+locationDataFrame <- as.data.frame(cbind(lon,lat))
+locationDataFrame
+# getting the map
+mapgilbert <- get_map(location = c(lon = mean(lon), lat = mean(lat)), zoom = 4,
+                      maptype = "terrain", scale = "auto")
+
+# plotting the map with some points on it
+#library(devtools)
+#install_version("ggplot2", version = "2.1.0", repos = "http://cran.us.r-project.org")
+ggmap(mapgilbert) +
+  geom_point(data = locationDataFrame , aes(x = lon, y = lat, fill = "red", alpha = 0.8), size = 3, shape = 23) +
+  guides(fill=FALSE, alpha=FALSE, size=FALSE)
+
+#create heatmap
+resultTable<-returnTable()
+names(resultTable)<-c('name','state','review','rating','lat','lon')
+lat<-resultTable$lat
+lon<-resultTable$lon
+resultTable$rating
+mapGoogle <- get_map(location = 'united states', zoom=4, maptype = "terrain", source ='google', color='color')
+ggmap(mapGoogle)
+ggmap(mapGoogle)+geom_point(data = resultTable , aes(x = lon, y = lat, colour=resultTable$rating, alpha = 0.2), size = 12, shape = 20)+scale_color_gradient(low = "beige",high="purple")
+
+
+#Create word cloud
+resultTable<-returnTable()
+names(resultTable)<-c('name','state','review','rating','lat','lon')
+yelpCorpus = Corpus(VectorSource(resultTable$review))
+tdm = TermDocumentMatrix(yelpCorpus)
+inspect(tdm)
+dtm = DocumentTermMatrix(yelpCorpus)
+inspect(dtm)
+freq = colSums(as.matrix(dtm))
+length(freq)
+orderedFreq = order(freq)
+print(orderedFreq)
+freq[tail(orderedFreq)]
+freq[head(orderedFreq)]
+tail(table(freq), 20)
+wf = data.frame(word=names(freq), freq=freq)
+plot = ggplot(subset(wf, freq>80), aes(word,freq)) #freq>2 argument means plot only words that have a frequency greater than 2
+plot = plot + geom_bar(stat="identity")
+plot = plot + theme(axis.text.x=element_text(angle=45, hjust=1))
+plot #plot frequence graph
+#findAssocs(dtm, searchTerm, corlimit=0.4)
+col=brewer.pal(6,"Dark2")
+wordcloud(yelpCorpus, min.freq=2, scale=c(5,2),rot.per = 0.25,
+          random.color=T, max.word=150, random.order=FALSE,colors=col)
+
+#Sentiment Analysis
+setwd("/Users/Documents/R")
+positive_train = readLines("./positive_train.txt")
+negative_train = readLines("./negative_train.txt")
+positive_test = readLines("./positive_test.txt")
+negative_test = readLines("./negative_test.txt")
+message_train = c(positive_train, negative_train)
+message_test=c(positive_test,negative_test)
+message_all=c(message_train,message_test)
+sentiment_train = c(rep("positive", length(positive_train) ), 
+              rep("negative", length(negative_train)))
+sentiment_test = c(rep("positive", length(positive_test) ), 
+                   rep("negative", length(negative_test)))
+sentiment_all = as.factor(c(sentiment_train, sentiment_test))
+matrix= create_matrix(message_all, language="english", 
+                   removeStopwords=FALSE, removeNumbers=TRUE, 
+                   stemWords=FALSE, tm::weightTfIdf)
+mat = as.matrix(matrix)
+
+#SENTIMENT ANALYSIS USING NAIVE BAYES
+classifier = naiveBayes(mat[1:616,], as.factor(sentiment_all[1:616]))
+predicted = predict(classifier, mat[617:880,])
+predicted
+table(sentiment_test, predicted)
+recall_accuracy(sentiment_test, predicted)
+
+#SENTIMENT ANALYSIS USING TREE, SVM, Maximum Entropy, Random Forest ALGORITHMS
+container = create_container(mat, as.factor(sentiment_all),
+                             trainSize=1:616, testSize=617:880,virgin=FALSE)
+models = train_models(container, algorithms=c("SVM", "TREE", "MAXENT", "RF"))
+results_sentiments = classify_models(container, models)
+results_sentiments
+table_tree<-table(as.factor(sentiment_all[617:880]), results_sentiments[, "TREE_LABEL"],dnn = list('actual','predicted')) #Confusion Matrix for Tree
+table_tree
+recall_accuracy(sentiment_test, results_sentiments[, "TREE_LABEL"]) #Accuracy for Tree
+
+table_SVM<-table(as.factor(sentiment_all[617:880]), results_sentiments[, "SVM_LABEL"],dnn = list('actual','predicted')) #Confusion Matrix for SVM
+table_SVM
+recall_accuracy(sentiment_test, results_sentiments[, "SVM_LABEL"]) #Accuracy for SVM
+
+table_MAXENT<-table(as.factor(sentiment_all[617:880]), results_sentiments[, "MAXENTROPY_LABEL"],dnn = list('actual','predicted')) #Confusion Matrix for Maximum Entropy
+table_MAXENT
+recall_accuracy(sentiment_test, results_sentiments[, "MAXENTROPY_LABEL"]) #Accuracy for Maximum Entropy
+
+table_RF<-table(as.factor(sentiment_all[617:880]), results_sentiments[, "FORESTS_LABEL"],dnn = list('actual','predicted')) #Confusion Matrix for Random Forest
+table_RF
+recall_accuracy(sentiment_test, results_sentiments[, "FORESTS_LABEL"]) #Accuracy for Random Forest
+
+#Topic Modelling 
+resultTable<-returnTable()
+names(resultTable)<-c('name','state','review','rating','lat','lon')
+# Here we pre-process the data in some standard ways. I'll post-define each step
+resultTable$review <- iconv(resultTable$review, to = "ASCII", sub = " ")  # Convert to basic ASCII text to avoid silly characters
+resultTable$review <- tolower(resultTable$review)  # Make everything consistently lower case
+resultTable$review <- gsub("rt", " ", resultTable$review)  # Remove the "RT" (retweet) so duplicates are duplicates
+resultTable$review <- gsub("@\\w+", " ", resultTable$review)  # Remove user names (all proper names if you're wise!)
+resultTable$review <- gsub("http.+ |http.+$", " ", resultTable$review)  # Remove links
+resultTable$review <- gsub("[[:punct:]]", " ", resultTable$review)  # Remove punctuation
+resultTable$review <- gsub("[ |\t]{2,}", " ", resultTable$review)  # Remove tabs
+resultTable$review <- gsub("amp", " ", resultTable$review)  # "&" is "&amp" in HTML, so after punctuation removed ...
+resultTable$review <- gsub("^ ", "", resultTable$review)  # Leading blanks
+resultTable$review <- gsub(" $", "", resultTable$review)  # Lagging blanks
+resultTable$review <- gsub(" +", " ", resultTable$review) # General spaces (should just do all whitespaces no?)
+#resultTable$review <- unique(resultTable$review)  # Now get rid of duplicates!
+resultTable$review
+# Convert to tm corpus and use its API for some additional fun
+corpus <- Corpus(VectorSource(resultTable$review))  # Create corpus object
+
+# Remove English stop words. This could be greatly expanded!
+# Don't forget the mc.cores thing
+corpus <- tm_map(corpus, removeWords, stopwords("en"), mc.cores=1) 
+# Remove numbers. This could have been done earlier, of course.
+corpus <- tm_map(corpus, removeNumbers, mc.cores=1)
+# Stem the words. Google if you don't understand
+corpus <- tm_map(corpus, stemDocument, mc.cores=1)
+# Remove the stems associated with our search terms!
+corpus <- tm_map(corpus, removeWords, c("energi", "electr"), mc.cores=1)
+# Visualize corpus in a Wordcloud
+pal <- brewer.pal(8, "Dark2")
+wordcloud(corpus, min.freq=2, max.words = 150, random.order = TRUE, colors=pal)
+
+# Get the lengths and make sure we only create a DTM for tweets with
+# some actual content
+doc.lengths <- rowSums(as.matrix(DocumentTermMatrix(corpus)))
+dtm <- DocumentTermMatrix(corpus[doc.lengths > 0])
+model <- LDA(dtm, 10)  # Go ahead and test a simple model if you want
+model
+# Now for some topics
+SEED = sample(1:1000000, 1)  # Pick a random seed for replication
+k = 10  # Let's start with 10 topics
+models <- list(
+  CTM       = CTM(dtm, k = k, control = list(seed = SEED, var = list(tol = 10^-4), em = list(tol = 10^-3))),
+  VEM       = LDA(dtm, k = k, control = list(seed = SEED)),
+  VEM_Fixed = LDA(dtm, k = k, control = list(estimate.alpha = FALSE, seed = SEED)),
+  Gibbs     = LDA(dtm, k = k, method = "Gibbs", control = list(seed = SEED, burnin = 1000,
+                                                               thin = 100,    iter = 1000))
+)
+# There you have it. Models now holds 4 topics. See the topicmodels API documentation for details
+
+# Top 10 terms of each topic for each model
+# Do you see any themes you can label to these "topics" (lists of words)?
+lapply(models, terms, 10)
+
+```
